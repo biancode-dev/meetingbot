@@ -1,33 +1,30 @@
+Please summarize meeting notes and action items based on the following transcript in raw markdown using the following format:
+
 # Meeting Minutes
+
 ## Meeting Information
-**Meeting Date/Time:** meeting_date, meeting_time  
-**Meeting Purpose:** meeting_purpose  
-**Meeting Location:** meeting_location  
-**Note Taker:** note_taker  
+
+**Meeting Date/Time:** (meeting date YYYY-MM-DD), (meeting time)
+**Note Taker:** Limitless, ChatGPT (Summarization)
 
 ## Attendees
-People who attended:
-- Person A
-- Person B
-- Person C
+
+People who attended: Jason, Sarah, Owen, Alex, Sahib
+(Unless they are mentioned absent)
 
 ## Agenda Items
 
-Item | Description
----- | ----
-Agenda Item 1 | • <br>• <br>• <br>• <br>• 
-Agenda Item 2 | • <br>• <br>• <br>• <br>• 
+1. (agenda item)
+2. ...
 
 ## Discussion Items
-Item | Who | Notes |
----- | ---- | ---- |
-item | who | notes |
 
+### (Point Discussed)
+
+- (description of the point discussed)
+- ...
 
 ## Action Items
-| Done? | Item | Responsible | Due Date |
-| ---- | ---- | ---- | ---- |
-| | item | who | due_date |
 
-## Other Notes & Information
-N/A
+- **(Person assigned if mentioned, otherwise, "Anyone")**: (action item)
+- ...
