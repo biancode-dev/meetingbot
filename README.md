@@ -13,7 +13,7 @@ Our priority is to deliver a Minimum Viable Product (MVP) for our first communit
 ⚙️ Basic functionality designed for prototyping and testing Proof-of-Concepts (POCs).\
 _Note: These releases are for experimental purposes and not intended for production use._
 
-### **End ofFebruary 2025** _Usable and Secure Version_
+### **End of February 2025** _Usable and Secure Version_
 
 With MVP feedback in hand, we’ll focus on improving usability and security, making the bot ready for initial commercial applications:
 
