@@ -23,6 +23,7 @@ const userAgent =
 // Constant Selectors
 const enterNameField = 'input[type="text"][aria-label="Your name"]';
 const askToJoinButton = '//button[.//span[text()="Ask to join"]]';
+const joinNowButton = '//button[.//span[text()="Join now"]]';
 const gotKickedDetector = '//button[.//span[text()="Return to home screen"]]';
 const leaveButton = `//button[@aria-label="Leave call"]`;
 const peopleButton = `//button[@aria-label="People"]`;
@@ -135,7 +136,7 @@ export class MeetsBot extends Bot {
     onEvent: (eventType: EventCode, data?: any) => Promise<void>
   ) {
     super(botSettings, onEvent);
-    this.recordingPath = path.resolve('/tmp/recording.mp4');
+    this.recordingPath = path.resolve('/rec/recording.mp4');
 
     this.browserArgs = [
       "--incognito",
@@ -297,10 +298,13 @@ export class MeetsBot extends Bot {
       console.log('Could not turn off Camera -- probably already off.');
     }
 
-    // Click the "Ask to join" button
-    console.log('Waiting for the "Ask to join" button...');
-    await this.page.waitForSelector(askToJoinButton, { timeout: 60000 });
-    await this.page.click(askToJoinButton);
+    console.log('Waiting for either the "Join now" or "Ask to join" button to appear...');
+    const entryButton = await Promise.race([
+      this.page.waitForSelector(joinNowButton, { timeout: 60000 }).then(() => joinNowButton),
+      this.page.waitForSelector(askToJoinButton, { timeout: 60000 }).then(() => askToJoinButton),
+    ]);
+
+    await this.page.click(entryButton);
 
     //Should Exit after 1 Minute
     console.log("Awaiting Entry ....");
@@ -520,6 +524,18 @@ export class MeetsBot extends Bot {
     return false;
   }
 
+  /**
+   * Check if a pop-up appeared. If so, close it.
+   */
+  async handleInfoPopup(timeout = 5000) {
+    try {
+      await this.page.waitForSelector(infoPopupClick, { timeout });
+    } catch (e) {
+      return;
+    }
+    console.log("Clicking the popup...");
+    await this.page.click(infoPopupClick);
+  }
 
   /**
    * 
@@ -540,15 +556,8 @@ export class MeetsBot extends Bot {
     console.log("Starting Recording");
     this.startRecording();
 
-    // Check if a popup appeared
-    try {
-      console.log("Waiting for the 'Others might see you differently' popup...");
-      await this.page.waitForSelector(infoPopupClick, { timeout: 5000 });
-      console.log("Clicking the popup...");
-      await this.page.click(infoPopupClick, { timeout: 500 });
-    } catch (e) {
-      console.log("No Popup Found, continuing.");
-    }
+    console.log("Waiting for the 'Others might see you differently' popup...");
+    await this.handleInfoPopup();
 
     // Meeting Join Actions
     try {
@@ -684,6 +693,8 @@ export class MeetsBot extends Bot {
         break; //exit loop
 
       }
+
+      await this.handleInfoPopup(1000);
 
       // Reset Loop
       console.log('Waiting 5 seconds.')
