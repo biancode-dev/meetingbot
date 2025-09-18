@@ -88,7 +88,7 @@ resource "aws_autoscaling_group" "ecs_instances" {
 }
 
 resource "aws_ecs_capacity_provider" "ec2" {
-  name = "EC2"
+  name = "meetingbot-dev-ec2"
 
   auto_scaling_group_provider {
     auto_scaling_group_arn         = aws_autoscaling_group.ecs_instances.arn
