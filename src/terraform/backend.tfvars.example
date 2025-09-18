@@ -1,5 +1,5 @@
-bucket = "tf-state-5419"
+bucket = "talksy-meetingbot"
 key = "meetingbot/terraform.tfstate"
-region = "us-east-2"
+region = "us-east-1"
 profile = "meetingbot"
 dynamodb_table = "tf-lock"
