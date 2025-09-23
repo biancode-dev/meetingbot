@@ -71,6 +71,16 @@ export async function deployBot({
     throw new Error("Bot not found");
   }
   const bot = botResult[0];
+  
+  // Get user email
+  const userResult = await db.select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, bot.userId));
+  if (!userResult[0]) {
+    throw new Error("User not found");
+  }
+  
+  // Use email if available, otherwise use userId as fallback
+  const userEmail = userResult[0].email || `user_${bot.userId.replace(/-/g, '_')}`;
+  console.log(`Bot ${botId}: Using email/identifier: ${userEmail}`);
   const dev = env.NODE_ENV === "development";
 
   // First, update bot status to deploying
@@ -85,6 +95,7 @@ export async function deployBot({
     const config: BotConfig = {
       id: botId,
       userId: bot.userId,
+      userEmail: userEmail,
       meetingTitle: bot.meetingTitle,
       meetingInfo: bot.meetingInfo,
       startTime: bot.startTime,

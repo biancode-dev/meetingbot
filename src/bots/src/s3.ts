@@ -85,10 +85,15 @@ export async function uploadRecordingToS3(s3Client: S3Client, bot: Bot): Promise
         }
     }
 
-    // Create UUID and initialize key
+    // Create UUID and initialize key with user email folder structure
     const uuid = randomUUID();
     const contentType = bot.getContentType();
-    const key = `recordings/${uuid}-${bot.settings.meetingInfo.platform
+    const userEmail = bot.settings.userEmail;
+    
+    // Sanitize email for folder name (replace @ with _ and remove special chars)
+    const sanitizedEmail = userEmail.replace(/@/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
+    
+    const key = `recordings/${sanitizedEmail}/${uuid}-${bot.settings.meetingInfo.platform
         }-recording.${contentType.split("/")[1]}`;
 
     try {

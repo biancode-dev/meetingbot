@@ -1,5 +1,18 @@
-// app/api/bots/route.ts
+// app/api/send-bot/route.ts
 import { NextResponse } from 'next/server';
+
+// Handle CORS preflight requests
+export async function OPTIONS(req: Request) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
 
 export async function POST(req: Request) {
   try {
@@ -34,10 +47,21 @@ export async function POST(req: Request) {
 
     const data = await response.json();
     console.log('RECEIVED', data);
-    return NextResponse.json(data, { status: response.status });
+    
+    const nextResponse = NextResponse.json(data, { status: response.status });
+    nextResponse.headers.set('Access-Control-Allow-Origin', '*');
+    nextResponse.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    nextResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
+    
+    return nextResponse;
   } catch (error) {
     console.error('Error:', error);
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'An unknown error occurred' }, { status: 500 });
-
+    
+    const errorResponse = NextResponse.json({ error: error instanceof Error ? error.message : 'An unknown error occurred' }, { status: 500 });
+    errorResponse.headers.set('Access-Control-Allow-Origin', '*');
+    errorResponse.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    errorResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key');
+    
+    return errorResponse;
   }
 }

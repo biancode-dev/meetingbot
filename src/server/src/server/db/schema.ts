@@ -295,6 +295,7 @@ export type SelectBotType = z.infer<typeof selectBotSchema>;
 export const botConfigSchema = z.object({
   id: z.number(),
   userId: z.string(),
+  userEmail: z.string().email(),
   meetingInfo: meetingInfoSchema,
   meetingTitle: z.string(),
   startTime: z.date(),

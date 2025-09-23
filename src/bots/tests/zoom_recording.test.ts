@@ -29,6 +29,8 @@ dotenv.config({ path: 'test.env' });
 // Create Mock Configs
 const mockZoomConfig = {
     id: 0,
+    userId: "test-user-id",
+    userEmail: "test@example.com",
     meetingInfo: JSON.parse(process.env.ZOOM_TEST_MEETING_INFO || '{}'),
     automaticLeave: {
         // automaticLeave: null, //Not included to see what happens on a bad config
