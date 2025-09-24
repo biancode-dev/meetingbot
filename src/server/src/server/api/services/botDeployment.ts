@@ -1,4 +1,4 @@
-import { type BotConfig, bots } from "~/server/db/schema";
+import { type BotConfig, bots, users } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type * as schema from "~/server/db/schema";
@@ -73,13 +73,13 @@ export async function deployBot({
   const bot = botResult[0];
   
   // Get user email
-  const userResult = await db.select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, bot.userId));
+  const userResult = await db.select({ email: users.email }).from(users).where(eq(users.id, bot.userId));
   if (!userResult[0]) {
     throw new Error("User not found");
   }
   
   // Use email if available, otherwise use userId as fallback
-  const userEmail = userResult[0].email || `user_${bot.userId.replace(/-/g, '_')}`;
+  const userEmail = userResult[0].email ?? `user_${bot.userId.replace(/-/g, '_')}`;
   console.log(`Bot ${botId}: Using email/identifier: ${userEmail}`);
   const dev = env.NODE_ENV === "development";
 
