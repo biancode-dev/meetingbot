@@ -45,8 +45,9 @@ export default function BotsPage() {
       header: "Recording Length",
       cell: ({ row }) => {
         const recording = row.original.recording;
+        const botId = row.original.id;
         return recording ? (
-          <Link href={recording} target="_blank">
+          <Link href={`/api/trpc/bots.getSignedRecordingUrl?input={"id":${botId}}`} target="_blank">
             {recording} <ExternalLinkIcon className="h-4 w-4" />
           </Link>
         ) : (
