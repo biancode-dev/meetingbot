@@ -46,10 +46,25 @@ export default function BotsPage() {
       cell: ({ row }) => {
         const recording = row.original.recording;
         const botId = row.original.id;
+        const getSignedUrl = api.bots.getSignedRecordingUrl.useQuery(
+          { id: botId },
+          { enabled: !!recording && !!botId }
+        );
+        
+        const handleRecordingClick = () => {
+          if (getSignedUrl.data?.recordingUrl) {
+            window.open(getSignedUrl.data.recordingUrl, '_blank');
+          }
+        };
+        
         return recording ? (
-          <Link href={`/api/trpc/bots.getSignedRecordingUrl?input={"id":${botId}}`} target="_blank">
+          <button 
+            onClick={handleRecordingClick}
+            disabled={!getSignedUrl.data?.recordingUrl}
+            className="flex items-center gap-1 text-blue-600 hover:text-blue-800 disabled:text-gray-400"
+          >
             {recording} <ExternalLinkIcon className="h-4 w-4" />
-          </Link>
+          </button>
         ) : (
           "No Recording Available"
         );
