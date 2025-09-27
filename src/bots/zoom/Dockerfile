@@ -20,7 +20,7 @@ WORKDIR /home/pptruser
 
 # Copy files
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-COPY zoom/package.json zoom/pnpm-lock.yaml ./zoom/
+COPY src/bots/zoom/package.json src/bots/zoom/pnpm-lock.yaml ./zoom/
 
 # Install dependencies as root
 RUN pnpm install --filter "@bots/zoom" --filter "bots"
@@ -30,7 +30,7 @@ RUN pnpm dlx puppeteer browsers install chrome
 
 # Copy the rest of the application files last
 COPY src ./src
-COPY zoom/src ./zoom/src
+COPY src/bots/zoom/src ./zoom/src
 
 # Change ownership of all files after installation
 RUN chown -R pptruser:pptruser /home/pptruser
