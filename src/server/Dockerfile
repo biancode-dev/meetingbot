@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Install dependencies based on the preferred package manager
 
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml\* ./
+COPY src/server/package.json src/server/yarn.lock* src/server/package-lock.json* pnpm-lock.yaml ./
 
 RUN \
     if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
@@ -36,7 +36,7 @@ ARG ECS_SECURITY_GROUPS
 
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY src/server/ .
 
 # ENV NEXT_TELEMETRY_DISABLED 1
 
