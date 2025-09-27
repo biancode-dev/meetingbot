@@ -20,7 +20,7 @@ WORKDIR /home/pptruser
 
 # Copy files
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-COPY teams/package.json teams/pnpm-lock.yaml ./teams/
+COPY src/bots/teams/package.json src/bots/teams/pnpm-lock.yaml ./teams/
 
 # Install dependencies as root
 RUN pnpm install --filter "@bots/teams" --filter "bots"
@@ -33,7 +33,7 @@ RUN chown -R pptruser:pptruser /home/pptruser
 
 #  Copy the rest of the application last
 COPY src ./src
-COPY teams/src ./teams/src
+COPY src/bots/teams/src ./teams/src
 
 # Change ownership of working files after installation
 RUN chown -R pptruser:pptruser /home/pptruser/src && chmod -R 755 /home/pptruser/src
