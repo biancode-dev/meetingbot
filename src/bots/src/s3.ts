@@ -85,16 +85,22 @@ export async function uploadRecordingToS3(s3Client: S3Client, bot: Bot): Promise
         }
     }
 
-    // Create UUID and initialize key with user email folder structure
+    // Create UUID and initialize key
     const uuid = randomUUID();
     const contentType = bot.getContentType();
-    const userEmail = bot.settings.userEmail;
-    
-    // Sanitize email for folder name (replace @ with _ and remove special chars)
-    const sanitizedEmail = userEmail.replace(/@/g, '_').replace(/[^a-zA-Z0-9_-]/g, '');
-    
-    const key = `recordings/${sanitizedEmail}/${uuid}-${bot.settings.meetingInfo.platform
-        }-recording.${contentType.split("/")[1]}`;
+
+    // Create S3 key with user organization if userEmail is provided
+    let key: string;
+    if (bot.settings.userEmail) {
+        // New structure: users/{email}/recordings/{uuid}-{platform}-recording.{ext}
+        const sanitizedEmail = bot.settings.userEmail.replace(/[^a-zA-Z0-9@._-]/g, '_');
+        key = `users/${sanitizedEmail}/recordings/${uuid}-${bot.settings.meetingInfo.platform}-recording.${contentType.split("/")[1]}`;
+        console.log(`Using user-organized S3 structure for email: ${bot.settings.userEmail}`);
+    } else {
+        // Fallback to original structure for backward compatibility
+        key = `recordings/${uuid}-${bot.settings.meetingInfo.platform}-recording.${contentType.split("/")[1]}`;
+        console.log("Using original S3 structure (no user email provided)");
+    }
 
     try {
         const commandObjects = {
