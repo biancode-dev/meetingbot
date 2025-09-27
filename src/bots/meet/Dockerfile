@@ -20,13 +20,13 @@ RUN npm install -g pnpm
 
 # Copy dependency files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY meet/package.json meet/pnpm-lock.yaml meet/entrypoint.sh ./meet/
+COPY src/bots/meet/package.json src/bots/meet/pnpm-lock.yaml src/bots/meet/entrypoint.sh ./meet/
 
 # Convert entrypoint.sh to use Unix line endings
 RUN sed -i 's/\r$//' ./meet/entrypoint.sh
 
 # Install dependencies
-RUN pnpm install --filter "@bots/meet" --filter "bots"
+RUN pnpm install
 
 # Install Playwright dependencies
 RUN pnpm dlx playwright@1.52.0 install-deps
@@ -68,7 +68,7 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 COPY --from=base /app/node_modules /app/node_modules
 COPY --from=base /app/package.json /app/package.json
 COPY --from=base /app/pnpm-workspace.yaml /app/pnpm-workspace.yaml
-COPY --from=base /app/meet/node_modules /app/meet/node_modules
+# COPY --from=base /app/meet/node_modules /app/meet/node_modules
 COPY --from=base /app/meet/package.json /app/meet/package.json
 COPY --from=base /app/meet/pnpm-lock.yaml /app/meet/pnpm-lock.yaml
 COPY --from=base /root/ms-playwright /root/ms-playwright
@@ -80,7 +80,7 @@ RUN chown -R meetbot:meetbot /root/ms-playwright
 
 # Copy working files into the container
 COPY src ./src
-COPY meet/src ./meet/src
+COPY src/bots/meet/src ./meet/src
 COPY test.env ./
 RUN chown -R meetbot:meetbot ./src
 RUN chown -R meetbot:meetbot ./meet/src
