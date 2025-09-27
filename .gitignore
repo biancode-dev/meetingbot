@@ -12,4 +12,4 @@ config.json
 envBotData.ts
 
 **/.next/
-/src/bots/screenshot.png
+/src/bots/screenshot.pngsrc/terraform/terraform.tfstate.d/
