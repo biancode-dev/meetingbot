@@ -89,18 +89,10 @@ export async function uploadRecordingToS3(s3Client: S3Client, bot: Bot): Promise
     const uuid = randomUUID();
     const contentType = bot.getContentType();
 
-    // Create S3 key with user organization if userEmail is provided
-    let key: string;
-    if (bot.settings.userEmail) {
-        // New structure: users/{email}/recordings/{uuid}-{platform}-recording.{ext}
-        const sanitizedEmail = bot.settings.userEmail.replace(/[^a-zA-Z0-9@._-]/g, '_');
-        key = `users/${sanitizedEmail}/recordings/${uuid}-${bot.settings.meetingInfo.platform}-recording.${contentType.split("/")[1]}`;
-        console.log(`Using user-organized S3 structure for email: ${bot.settings.userEmail}`);
-    } else {
-        // Fallback to original structure for backward compatibility
-        key = `recordings/${uuid}-${bot.settings.meetingInfo.platform}-recording.${contentType.split("/")[1]}`;
-        console.log("Using original S3 structure (no user email provided)");
-    }
+    // Create S3 key following the specification: incoming/<job_id>/raw.mp4
+    const jobId = bot.settings.meetingInfo.messageId || bot.settings.id.toString();
+    const key = `incoming/${jobId}/raw.mp4`;
+    console.log(`Using specification-compliant S3 structure: ${key}`);
 
     try {
         const commandObjects = {
@@ -108,6 +100,8 @@ export async function uploadRecordingToS3(s3Client: S3Client, bot: Bot): Promise
             Key: key,
             Body: fileContent,
             ContentType: contentType,
+            Tagging: `tenant_id=${bot.settings.meetingInfo.tenantId || 'unknown'}&user_id=${bot.settings.userId}&recording_id=${jobId}&status=raw`,
+            ServerSideEncryption: 'aws:kms'
         };
 
         const putCommand = new PutObjectCommand(commandObjects);

@@ -6,8 +6,9 @@
  * using the existing bot infrastructure.
  */
 
-const { SQSClient, ReceiveMessageCommand, DeleteMessageCommand, SendMessageCommand } = require('@aws-sdk/client-sqs');
+const { SQSClient, ReceiveMessageCommand, DeleteMessageCommand, SendMessageCommand, GetQueueAttributesCommand } = require('@aws-sdk/client-sqs');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { ECSClient, RunTaskCommand } = require('@aws-sdk/client-ecs');
 const { spawn } = require('child_process');
 const { promises: fs } = require('fs');
 const http = require('http');
@@ -15,14 +16,23 @@ const { randomUUID } = require('crypto');
 
 // Configuration
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
-const SQS_QUEUE_URL = process.env.SQS_QUEUE_URL;
-const COMPLETION_QUEUE_URL = process.env.COMPLETION_QUEUE_URL;
+const SQS_QUEUE_URL = process.env.MEETINGBOT_JOBS_QUEUE_URL;
+const COMPLETION_QUEUE_URL = process.env.RECORDING_COMPLETED_QUEUE_URL;
 const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME;
 const MAX_CONCURRENT_RECORDINGS = parseInt(process.env.MAX_CONCURRENT_RECORDINGS || '5');
+
+// ECS Configuration
+const ECS_CLUSTER_NAME = process.env.ECS_CLUSTER_NAME || 'meetingbot-dev';
+const ECS_TASK_DEFINITION_MEET = process.env.ECS_TASK_DEFINITION_MEET || 'meetingbot-dev-meet:latest';
+const ECS_TASK_DEFINITION_TEAMS = process.env.ECS_TASK_DEFINITION_TEAMS || 'meetingbot-dev-teams:latest';
+const ECS_TASK_DEFINITION_ZOOM = process.env.ECS_TASK_DEFINITION_ZOOM || 'meetingbot-dev-zoom:latest';
+const ECS_SUBNETS = process.env.ECS_SUBNETS ? process.env.ECS_SUBNETS.split(',') : ['subnet-12345678'];
+const ECS_SECURITY_GROUPS = process.env.ECS_SECURITY_GROUPS ? process.env.ECS_SECURITY_GROUPS.split(',') : ['sg-12345678'];
 
 // AWS Clients
 const sqsClient = new SQSClient({ region: AWS_REGION });
 const s3Client = new S3Client({ region: AWS_REGION });
+const ecsClient = new ECSClient({ region: AWS_REGION });
 
 // Active recordings tracking
 const activeRecordings = new Map();
@@ -64,48 +74,89 @@ class MeetingBotService {
 
       try {
         await this.processNextMessage();
-      } catch (error) {
-        console.error('❌ Error in processing loop:', error);
-      }
+    } catch (error) {
+      console.error('❌ Error in processing loop:', error);
+      console.error('❌ Error details:', error.message);
+      console.error('❌ Error stack:', error.stack);
+    }
     }, 1000); // Check every second
   }
 
   async processNextMessage() {
     try {
+      console.log(`🔍 Checking for messages in queue: ${SQS_QUEUE_URL}`);
+      console.log(`🔍 AWS Region: ${AWS_REGION}`);
+      console.log(`🔍 SQS Client configured: ${!!sqsClient}`);
+      
+      // Test SQS access first
+      console.log(`🔍 Testing SQS access...`);
+      try {
+        const testCommand = new GetQueueAttributesCommand({
+          QueueUrl: SQS_QUEUE_URL,
+          AttributeNames: ['All']
+        });
+        const testResponse = await sqsClient.send(testCommand);
+        console.log(`🔍 SQS Access test successful:`, JSON.stringify(testResponse.Attributes, null, 2));
+      } catch (testError) {
+        console.error(`❌ SQS Access test failed:`, testError);
+        return;
+      }
+      
       const command = new ReceiveMessageCommand({
         QueueUrl: SQS_QUEUE_URL,
         MaxNumberOfMessages: 1,
-        WaitTimeSeconds: 0, // Non-blocking
+        WaitTimeSeconds: 5, // Long polling - wait up to 5 seconds for messages
         MessageAttributeNames: ['All'],
         VisibilityTimeoutSeconds: 300 // 5 minutes
       });
 
+      console.log(`🔍 Sending SQS command...`);
       const response = await sqsClient.send(command);
+      console.log(`🔍 SQS Response received:`, JSON.stringify(response, null, 2));
+      
       const messages = response.Messages || [];
-
+      
+      console.log(`📨 Found ${messages.length} messages in queue`);
+      console.log(`📨 Messages:`, JSON.stringify(messages, null, 2));
+      
       if (messages.length === 0) {
         return; // No messages to process
       }
 
       const message = messages[0];
+      console.log(`📨 Processing message:`, JSON.stringify(message, null, 2));
+      console.log(`📨 **CHAMANDO processMessage...**`);
       await this.processMessage(message);
+      console.log(`📨 **processMessage CONCLUÍDO**`);
 
     } catch (error) {
       console.error('❌ Error receiving message:', error);
+      console.error('❌ Error details:', error.message);
+      console.error('❌ Error stack:', error.stack);
     }
   }
 
   async processMessage(message) {
+    console.log(`📨 **INICIANDO PROCESSAMENTO DE MENSAGEM:**`);
+    console.log(`📨 Message:`, JSON.stringify(message, null, 2));
+    
     const receiptHandle = message.ReceiptHandle;
+    console.log(`📨 Receipt Handle:`, receiptHandle);
+    
     let jobData;
 
     try {
       // Parse message body
       jobData = JSON.parse(message.Body);
+      console.log(`📨 Job Data:`, JSON.stringify(jobData, null, 2));
       console.log(`📨 Processing job: ${jobData.job_id} (${jobData.platform})`);
 
       // Validate job data
-      if (!this.validateJobData(jobData)) {
+      console.log(`📨 Validating job data...`);
+      const validationResult = this.validateJobData(jobData);
+      console.log(`📨 Validation result:`, validationResult);
+      
+      if (!validationResult) {
         console.error(`❌ Invalid job data for ${jobData.job_id}`);
         await this.deleteMessage(receiptHandle);
         return;
@@ -165,7 +216,7 @@ class MeetingBotService {
     }
 
     // Validate platform
-    const supportedPlatforms = ['google_meet', 'zoom', 'teams'];
+    const supportedPlatforms = ['google', 'google_meet', 'zoom', 'teams'];
     if (!supportedPlatforms.includes(jobData.platform)) {
       console.error(`❌ Unsupported platform: ${jobData.platform}`);
       return false;
@@ -195,13 +246,16 @@ class MeetingBotService {
       const botConfig = {
         id: parseInt(jobId.split('-').pop() || '0'),
         userId: jobData.user_id,
-        userEmail: `${jobData.user_id}@talksy.io`, // Generate email from user_id
+        userEmail: jobData.user_email || `${jobData.user_id}@talksy.io`, // Use real email or generate from user_id
+        platform: platform, // Add platform to botConfig
         meetingTitle: jobData.meeting_title,
         meetingInfo: {
           platform: botPlatform,
           meetingUrl: jobData.meeting_info.meeting_url,
           meetingId: jobData.meeting_info.meeting_id,
-          meetingPassword: jobData.meeting_info.password
+          meetingPassword: jobData.meeting_info.password,
+          tenantId: jobData.tenant_id, // Pass tenant_id for S3 organization
+          messageId: jobId // Pass job_id as messageId for S3 key
         },
         startTime: new Date(jobData.startTime || Date.now()),
         endTime: new Date(jobData.endTime || Date.now() + 2 * 60 * 60 * 1000),
@@ -278,69 +332,85 @@ class MeetingBotService {
   }
 
   async runBot(botConfig) {
-    return new Promise((resolve) => {
-      console.log(`🤖 Executando bot real para ${botConfig.platform}: ${botConfig.meetingInfo.meetingUrl}`);
+    try {
+      console.log(`🚀 Subindo task ECS para ${botConfig.platform}: ${botConfig.meetingInfo.meetingUrl}`);
       
-      const botProcess = spawn('npx', ['tsx', 'src/index.ts'], {
-        cwd: '/app/bots',
-        env: {
-          ...process.env,
-          BOT_DATA: JSON.stringify(botConfig),
-          AWS_BUCKET_NAME: S3_BUCKET_NAME,
-          AWS_REGION: AWS_REGION,
-          NODE_ENV: 'production'
-        }
-      });
+      // Select appropriate task definition based on platform
+      const taskDefinition = this.selectBotTaskDefinition(botConfig.platform);
+      
+      const input = {
+        cluster: ECS_CLUSTER_NAME,
+        taskDefinition: taskDefinition,
+        launchType: "FARGATE",
+        networkConfiguration: {
+          awsvpcConfiguration: {
+            subnets: ECS_SUBNETS,
+            securityGroups: ECS_SECURITY_GROUPS,
+            assignPublicIp: "ENABLED",
+          },
+        },
+        overrides: {
+          containerOverrides: [
+            {
+              name: "bot",
+              environment: [
+                {
+                  name: "BOT_DATA",
+                  value: JSON.stringify(botConfig),
+                },
+                {
+                  name: "AWS_BUCKET_NAME",
+                  value: S3_BUCKET_NAME,
+                },
+                {
+                  name: "AWS_REGION",
+                  value: AWS_REGION,
+                },
+                {
+                  name: "NODE_ENV",
+                  value: "production", // Bot runs in production mode
+                },
+              ],
+            },
+          ],
+        },
+      };
 
-      let output = '';
-      let errorOutput = '';
+      const command = new RunTaskCommand(input);
+      const response = await ecsClient.send(command);
+      
+      console.log(`✅ Task ECS iniciada: ${response.tasks?.[0]?.taskArn}`);
+      
+      // For now, return success - the bot will handle S3 upload and completion message
+      // In a real implementation, we'd monitor the task status
+      return {
+        success: true,
+        taskArn: response.tasks?.[0]?.taskArn,
+        duration: 0, // Will be updated by the bot
+        fileSize: 0  // Will be updated by the bot
+      };
+      
+    } catch (error) {
+      console.error(`❌ Failed to start ECS task:`, error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
 
-      botProcess.stdout.on('data', (data) => {
-        output += data.toString();
-        console.log(`Bot ${botConfig.job_id}: ${data.toString().trim()}`);
-      });
-
-      botProcess.stderr.on('data', (data) => {
-        errorOutput += data.toString();
-        console.error(`Bot ${botConfig.job_id} error: ${data.toString().trim()}`);
-      });
-
-      botProcess.on('close', (code) => {
-        if (code === 0) {
-          // Extract duration and file size from output
-          const durationMatch = output.match(/duration[:\s]+(\d+)/i);
-          const fileSizeMatch = output.match(/file[_\s]*size[:\s]+(\d+)/i);
-          
-          resolve({
-            success: true,
-            duration: durationMatch ? parseInt(durationMatch[1]) : 0,
-            fileSize: fileSizeMatch ? parseInt(fileSizeMatch[1]) : 0,
-            recordingPath: '/tmp/recording.mp4' // Default path
-          });
-        } else {
-          resolve({
-            success: false,
-            error: `Bot process exited with code ${code}: ${errorOutput}`
-          });
-        }
-      });
-
-      botProcess.on('error', (error) => {
-        resolve({
-          success: false,
-          error: `Failed to start bot process: ${error.message}`
-        });
-      });
-
-      // Timeout after 2 hours
-      setTimeout(() => {
-        botProcess.kill('SIGTERM');
-        resolve({
-          success: false,
-          error: 'Bot execution timeout (2 hours)'
-        });
-      }, 2 * 60 * 60 * 1000);
-    });
+  selectBotTaskDefinition(platform) {
+    switch (platform?.toLowerCase()) {
+      case "google":
+      case "google_meet":
+        return ECS_TASK_DEFINITION_MEET;
+      case "teams":
+        return ECS_TASK_DEFINITION_TEAMS;
+      case "zoom":
+        return ECS_TASK_DEFINITION_ZOOM;
+      default:
+        throw new Error(`Unsupported platform: ${platform}`);
+    }
   }
 
   async uploadToS3(jobData, localPath) {
@@ -392,18 +462,16 @@ class MeetingBotService {
       recording_id: jobData.job_id,
       tenant_id: jobData.tenant_id,
       user_id: jobData.user_id,
+      s3_key_master: result.s3Path || `incoming/${jobData.job_id}/raw.mp4`, // Following specification
+      duration_sec: result.duration || 0,
+      size_bytes: result.fileSize || 0,
+      tracks: ["audio", "video"],
       platform: jobData.platform,
       meeting_title: jobData.meeting_title,
+      meeting_url: jobData.meeting_info.meeting_url,
       status: result.success ? 'completed' : 'failed',
-      s3_path: result.s3Path,
-      duration_seconds: result.duration,
-      file_size_bytes: result.fileSize,
       error: result.error,
-      completed_at: new Date().toISOString(),
-      metadata: {
-        bot_version: '1.0.0',
-        recording_quality: jobData.recording_settings?.quality || '1080p'
-      }
+      completed_at: new Date().toISOString()
     };
 
     try {
