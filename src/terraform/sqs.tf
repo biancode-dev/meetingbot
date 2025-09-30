@@ -21,7 +21,7 @@ resource "aws_sqs_queue" "meetingbot_jobs" {
   
   tags = {
     Name        = "talksy-meetingbot-jobs"
-    Environment = var.environment
+    Environment = "dev"
     Service     = "meetingbot"
   }
 }
@@ -37,7 +37,7 @@ resource "aws_sqs_queue" "meetingbot_dlq" {
   
   tags = {
     Name        = "talksy-meetingbot-dlq"
-    Environment = var.environment
+    Environment = "dev"
     Service     = "meetingbot"
   }
 }
@@ -56,7 +56,7 @@ resource "aws_sqs_queue" "recording_completed" {
   
   tags = {
     Name        = "talksy-recording-completed"
-    Environment = var.environment
+    Environment = "dev"
     Service     = "meetingbot"
   }
 }
@@ -80,7 +80,7 @@ resource "aws_iam_role" "meetingbot_service_role" {
   
   tags = {
     Name        = "${local.name}-meetingbot-service-role"
-    Environment = var.environment
+    Environment = "dev"
     Service     = "meetingbot"
   }
 }
@@ -147,7 +147,7 @@ resource "aws_cloudwatch_log_group" "meetingbot_service" {
   
   tags = {
     Name        = "${local.name}-meetingbot-service-logs"
-    Environment = var.environment
+    Environment = "dev"
     Service     = "meetingbot"
   }
 }
@@ -165,7 +165,7 @@ resource "aws_ecs_task_definition" "meetingbot_service" {
   container_definitions = jsonencode([
     {
       name      = "meetingbot-service"
-      image     = "lincolnbiancard/meetingbot-service:latest"
+      image     = "228692667167.dkr.ecr.us-east-1.amazonaws.com/meetingbot-service:latest"
       essential = true
       
       environment = [
@@ -217,7 +217,7 @@ resource "aws_ecs_task_definition" "meetingbot_service" {
   
   tags = {
     Name        = "${local.name}-meetingbot-service"
-    Environment = var.environment
+    Environment = "dev"
     Service     = "meetingbot"
   }
 }
@@ -225,14 +225,14 @@ resource "aws_ecs_task_definition" "meetingbot_service" {
 # ECS Service for MeetingBot Service
 resource "aws_ecs_service" "meetingbot_service" {
   name            = "${local.name}-meetingbot-service"
-  cluster         = aws_ecs_cluster.main.id
+  cluster         = aws_ecs_cluster.this.id
   task_definition = aws_ecs_task_definition.meetingbot_service.arn
   desired_count   = 2  # Run 2 instances for high availability
   
   launch_type = "FARGATE"
   
   network_configuration {
-    subnets          = var.private_subnet_ids
+    subnets          = aws_subnet.private[*].id
     security_groups  = [aws_security_group.ecs_tasks.id]
     assign_public_ip = false
   }
@@ -242,7 +242,7 @@ resource "aws_ecs_service" "meetingbot_service" {
   
   tags = {
     Name        = "${local.name}-meetingbot-service"
-    Environment = var.environment
+    Environment = "dev"
     Service     = "meetingbot"
   }
 }
@@ -251,7 +251,7 @@ resource "aws_ecs_service" "meetingbot_service" {
 resource "aws_appautoscaling_target" "meetingbot_service" {
   max_capacity       = 10
   min_capacity       = 2
-  resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.meetingbot_service.name}"
+  resource_id        = "service/${aws_ecs_cluster.this.name}/${aws_ecs_service.meetingbot_service.name}"
   scalable_dimension = "ecs:service:DesiredCount"
   service_namespace  = "ecs"
 }
@@ -323,7 +323,7 @@ resource "aws_sns_topic" "alerts" {
   
   tags = {
     Name        = "${local.name}-meetingbot-alerts"
-    Environment = var.environment
+    Environment = "dev"
     Service     = "meetingbot"
   }
 }
