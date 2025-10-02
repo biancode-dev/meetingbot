@@ -279,7 +279,7 @@ export class MeetsBot extends Bot {
   async joinMeeting() {
 
     // Launch
-    await this.launchBrowser();
+    await this.launchBrowser(false); // Use non-headless mode to avoid detection
 
     //
     await this.page.waitForTimeout(randomDelay(1000));

@@ -1,0 +1,30 @@
+FROM node:18-bullseye
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Instalar pnpm com SHELL definido
+ENV SHELL=/bin/bash
+ENV CI=true
+RUN curl -fsSL https://get.pnpm.io/install.sh | sh
+ENV PATH="/root/.local/share/pnpm:$PATH"
+
+# Instalar Playwright
+RUN npm install -g playwright
+RUN playwright install chromium
+RUN npx playwright install-deps
+
+# Copiar código do bot
+WORKDIR /app
+COPY src/bots/ ./bots/
+COPY package*.json ./
+
+# Instalar dependências
+WORKDIR /app/bots
+RUN pnpm install
+
+# Comando padrão
+CMD ["pnpm", "start"]

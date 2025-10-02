@@ -1,0 +1,26 @@
+{
+  "id": 999,
+  "userId": "test-user-456",
+  "userEmail": "test@talksy.io",
+  "platform": "google",
+  "meetingTitle": "Teste Manual Bot",
+  "meetingInfo": {
+    "platform": "google",
+    "meetingUrl": "https://meet.google.com/mcn-kfdq-gnb",
+    "meetingId": "mcn-kfdq-gnb",
+    "meetingPassword": null,
+    "tenantId": "test-tenant-123",
+    "messageId": "test-manual-bot"
+  },
+  "recordingSettings": {
+    "quality": "720p"
+  },
+  "automaticLeave": {
+    "waitingRoomTimeout": 300000,
+    "noOneJoinedTimeout": 600000,
+    "everyoneLeftTimeout": 300000,
+    "inactivityTimeout": 1800000
+  },
+  "heartbeatInterval": 5000,
+  "botDisplayName": "Teste Manual Bot"
+}

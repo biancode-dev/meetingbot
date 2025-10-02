@@ -279,7 +279,7 @@ export class MeetsBot extends Bot {
   async joinMeeting() {
 
     // Launch
-    await this.launchBrowser();
+    await this.launchBrowser(true); // Run in headless mode for AWS ECS
 
     //
     await this.page.waitForTimeout(randomDelay(1000));

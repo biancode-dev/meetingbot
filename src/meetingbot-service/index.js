@@ -23,7 +23,7 @@ const MAX_CONCURRENT_RECORDINGS = parseInt(process.env.MAX_CONCURRENT_RECORDINGS
 
 // ECS Configuration
 const ECS_CLUSTER_NAME = process.env.ECS_CLUSTER_NAME || 'meetingbot-dev';
-const ECS_TASK_DEFINITION_MEET = process.env.ECS_TASK_DEFINITION_MEET || 'meetingbot-dev-meet:latest';
+const ECS_TASK_DEFINITION_MEET = process.env.ECS_TASK_DEFINITION_MEET || 'meetingbot-dev-meet-bot-local:3';
 const ECS_TASK_DEFINITION_TEAMS = process.env.ECS_TASK_DEFINITION_TEAMS || 'meetingbot-dev-teams:latest';
 const ECS_TASK_DEFINITION_ZOOM = process.env.ECS_TASK_DEFINITION_ZOOM || 'meetingbot-dev-zoom:latest';
 const ECS_SUBNETS = process.env.ECS_SUBNETS ? process.env.ECS_SUBNETS.split(',') : ['subnet-12345678'];
@@ -171,8 +171,8 @@ class MeetingBotService {
       // Execute recording
       const result = await this.executeRecording(jobData);
 
-      // Send completion message
-      await this.sendCompletionMessage(jobData, result);
+      // Note: Bot will send completion message via SQS after recording is done
+      // No need to send completion here as bot has the real data
 
       // Delete processed message
       await this.deleteMessage(receiptHandle);
@@ -182,13 +182,8 @@ class MeetingBotService {
     } catch (error) {
       console.error(`❌ Error processing job ${jobData?.job_id}:`, error);
       
-      // Send failure completion message
-      if (jobData) {
-        await this.sendCompletionMessage(jobData, {
-          success: false,
-          error: error.message || 'Unknown error'
-        });
-      }
+      // Note: Bot will handle failure completion via SQS if it gets that far
+      // For ECS task failures, we rely on the bot's error handling
 
       // Delete message to prevent infinite retry
       await this.deleteMessage(receiptHandle);
@@ -320,6 +315,7 @@ class MeetingBotService {
 
   convertPlatformName(platform) {
     switch (platform) {
+      case 'google':
       case 'google_meet':
         return 'google';
       case 'teams':
@@ -334,9 +330,13 @@ class MeetingBotService {
   async runBot(botConfig) {
     try {
       console.log(`🚀 Subindo task ECS para ${botConfig.platform}: ${botConfig.meetingInfo.meetingUrl}`);
+      console.log(`🚀 ECS_TASK_DEFINITION_MEET: ${ECS_TASK_DEFINITION_MEET}`);
+      console.log(`🚀 ECS_TASK_DEFINITION_TEAMS: ${ECS_TASK_DEFINITION_TEAMS}`);
+      console.log(`🚀 ECS_TASK_DEFINITION_ZOOM: ${ECS_TASK_DEFINITION_ZOOM}`);
       
       // Select appropriate task definition based on platform
       const taskDefinition = this.selectBotTaskDefinition(botConfig.platform);
+      console.log(`🚀 Task Definition selecionada: ${taskDefinition}`);
       
       const input = {
         cluster: ECS_CLUSTER_NAME,
@@ -370,16 +370,30 @@ class MeetingBotService {
                   name: "NODE_ENV",
                   value: "production", // Bot runs in production mode
                 },
+                {
+                  name: "COMPLETION_QUEUE_URL",
+                  value: COMPLETION_QUEUE_URL,
+                },
               ],
             },
           ],
         },
       };
 
-      const command = new RunTaskCommand(input);
-      const response = await ecsClient.send(command);
+      console.log(`🚀 ECS Input:`, JSON.stringify(input, null, 2));
+      console.log(`🚀 ECS Client configured: ${!!ecsClient}`);
       
-      console.log(`✅ Task ECS iniciada: ${response.tasks?.[0]?.taskArn}`);
+      let response;
+      try {
+        const command = new RunTaskCommand(input);
+        response = await ecsClient.send(command);
+        
+        console.log(`✅ ECS Task started:`, JSON.stringify(response, null, 2));
+        console.log(`✅ Task ECS iniciada: ${response.tasks?.[0]?.taskArn}`);
+      } catch (ecsError) {
+        console.error(`❌ ECS Task failed:`, ecsError);
+        throw ecsError;
+      }
       
       // For now, return success - the bot will handle S3 upload and completion message
       // In a real implementation, we'd monitor the task status
@@ -400,15 +414,22 @@ class MeetingBotService {
   }
 
   selectBotTaskDefinition(platform) {
+    console.log(`🔍 selectBotTaskDefinition called with platform: "${platform}"`);
+    console.log(`🔍 platform?.toLowerCase(): "${platform?.toLowerCase()}"`);
+    
     switch (platform?.toLowerCase()) {
       case "google":
       case "google_meet":
+        console.log(`🔍 Selected ECS_TASK_DEFINITION_MEET: ${ECS_TASK_DEFINITION_MEET}`);
         return ECS_TASK_DEFINITION_MEET;
       case "teams":
+        console.log(`🔍 Selected ECS_TASK_DEFINITION_TEAMS: ${ECS_TASK_DEFINITION_TEAMS}`);
         return ECS_TASK_DEFINITION_TEAMS;
       case "zoom":
+        console.log(`🔍 Selected ECS_TASK_DEFINITION_ZOOM: ${ECS_TASK_DEFINITION_ZOOM}`);
         return ECS_TASK_DEFINITION_ZOOM;
       default:
+        console.log(`🔍 Platform "${platform}" not matched in switch statement`);
         throw new Error(`Unsupported platform: ${platform}`);
     }
   }

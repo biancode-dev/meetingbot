@@ -108,6 +108,7 @@ export async function uploadRecordingToS3(s3Client: S3Client, bot: Bot): Promise
             Key: key,
             Body: fileContent,
             ContentType: contentType,
+            ServerSideEncryption: 'aws:kms', // Required by bucket policy
         };
 
         const putCommand = new PutObjectCommand(commandObjects);

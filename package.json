@@ -13,5 +13,9 @@
     "overrides": {
       "@types/react": "^18.3.3"
     }
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.901.0",
+    "dotenv": "^17.2.3"
   }
-} 
+}

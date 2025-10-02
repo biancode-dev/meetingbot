@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { startHeartbeat, reportEvent } from "./monitoring";
 import { EventCode, type BotConfig } from "./types";
 import { createS3Client, uploadRecordingToS3 } from "./s3";
+import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
 
 dotenv.config({path: '../test.env'}); // Load test.env for testing
 dotenv.config();
@@ -14,6 +15,7 @@ export const main = async () => {
     "AWS_BUCKET_NAME",
     "AWS_REGION",
     "NODE_ENV",
+    "COMPLETION_QUEUE_URL",
   ] as const;
 
   // Check all required environment variables are present
@@ -36,6 +38,15 @@ export const main = async () => {
   if (!s3Client) {
     throw new Error("Failed to create S3 client");
   }
+
+  // Initialize SQS client for completion messages
+  const sqsClient = new SQSClient({ 
+    region: process.env.AWS_REGION!,
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+    }
+  });
 
   // Create the appropriate bot instance based on platform
   const bot = await createBot(botData);
@@ -93,11 +104,85 @@ export const main = async () => {
     const speakerTimeframes = bot.getSpeakerTimeframes();
     console.debug("Speaker timeframes:", speakerTimeframes);
     await reportEvent(botId, EventCode.DONE, { recording: key, speakerTimeframes });
+
+    // Send completion message to SQS queue
+    await sendCompletionMessage(sqsClient, botData, {
+      success: true,
+      s3Path: key,
+      duration: 0, // TODO: Implement getRecordingDuration() method
+      fileSize: 0, // TODO: Implement getRecordingSize() method
+      speakerTimeframes
+    });
+  } else {
+    // Send failure completion message to SQS queue
+    await sendCompletionMessage(sqsClient, botData, {
+      success: false,
+      error: 'Bot execution failed'
+    });
   }
 
   // Exit with appropriate code
   process.exit(hasErrorOccurred ? 1 : 0);
 };
+
+// Function to send completion message to SQS
+async function sendCompletionMessage(
+  sqsClient: SQSClient, 
+  botData: BotConfig, 
+  result: {
+    success: boolean;
+    s3Path?: string;
+    duration?: number;
+    fileSize?: number;
+    speakerTimeframes?: any;
+    error?: string;
+  }
+) {
+  try {
+    const completionMessage = {
+      recording_id: botData.meetingInfo.messageId || `bot-${botData.id}`,
+      tenant_id: botData.meetingInfo.tenantId || 'unknown',
+      user_id: botData.userId.toString(),
+      s3_key_master: result.s3Path || `incoming/${botData.id}/raw.mp4`,
+      duration_sec: result.duration || 0,
+      size_bytes: result.fileSize || 0,
+      tracks: ["audio", "video"],
+      platform: botData.platform,
+      meeting_title: botData.meetingTitle,
+      meeting_url: botData.meetingInfo.meetingUrl,
+      status: result.success ? 'completed' : 'failed',
+      error: result.error,
+      completed_at: new Date().toISOString()
+    };
+
+    const command = new SendMessageCommand({
+      QueueUrl: process.env.COMPLETION_QUEUE_URL!,
+      MessageBody: JSON.stringify(completionMessage),
+      MessageAttributes: {
+        tenant_id: {
+          DataType: 'String',
+          StringValue: completionMessage.tenant_id
+        },
+        recording_id: {
+          DataType: 'String',
+          StringValue: completionMessage.recording_id
+        },
+        status: {
+          DataType: 'String',
+          StringValue: completionMessage.status
+        }
+      },
+      MessageDeduplicationId: `completed-${completionMessage.recording_id}`,
+      MessageGroupId: completionMessage.tenant_id
+    });
+
+    await sqsClient.send(command);
+    console.log(`✅ Completion message sent to SQS: ${completionMessage.recording_id}`);
+
+  } catch (error) {
+    console.error('❌ Failed to send completion message to SQS:', error);
+  }
+}
 
 // Only run automatically if not in a test
 if (require.main === module) {
