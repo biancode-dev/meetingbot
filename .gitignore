@@ -13,3 +13,4 @@ envBotData.ts
 
 **/.next/
 /src/bots/screenshot.pngsrc/terraform/terraform.tfstate.d/
+test-local.env
