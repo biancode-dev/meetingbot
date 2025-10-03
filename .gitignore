@@ -7,9 +7,12 @@ node_modules/
 *.mp4
 
 .env
+.env.production
 .secrets
 config.json
+secrets.json
 envBotData.ts
+*.log
 
 **/.next/
 /src/bots/screenshot.pngsrc/terraform/terraform.tfstate.d/

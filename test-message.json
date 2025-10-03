@@ -1,16 +1,16 @@
 {
-  "job_id": "test-job-mcn-kfdq-gnb-local-2025",
+  "job_id": "test-job-azy-odsf-qfe-TIMESTAMP",
   "tenant_id": "test-tenant-123",
   "user_id": "test-user-456",
   "platform": "google_meet",
-  "bot_display_name": "Talksy Test Bot",
+  "bot_display_name": "Talksy Recording Bot",
   "meeting_info": {
-    "meeting_url": "https://meet.google.com/mcn-kfdq-gnb",
+    "meeting_url": "https://meet.google.com/azy-odsf-qfe",
     "platform": "google_meet",
-    "meeting_id": "mcn-kfdq-gnb",
+    "meeting_id": "azy-odsf-qfe",
     "password": null
   },
-  "meeting_title": "Teste Local - Nova Reunião Bot",
+  "meeting_title": "Teste Final - Sistema Completo",
   "automatic_leave": true,
   "recording_settings": {
     "quality": "720p",
@@ -18,8 +18,8 @@
     "transcription": true
   },
   "metadata": {
-    "created_at": "2025-01-02T14:55:00.000Z",
-    "scheduled_at": "2025-01-02T15:00:00.000Z",
+    "created_at": "2025-10-02T21:15:00.000Z",
+    "scheduled_at": "2025-10-02T21:20:00.000Z",
     "timezone": "America/Sao_Paulo"
   },
   "callback_url": "https://api.talksy.io/webhooks/recording-completed"

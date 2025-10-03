@@ -374,6 +374,14 @@ class MeetingBotService {
                   name: "COMPLETION_QUEUE_URL",
                   value: COMPLETION_QUEUE_URL,
                 },
+                {
+                  name: "AWS_ACCESS_KEY_ID",
+                  value: process.env.AWS_ACCESS_KEY_ID,
+                },
+                {
+                  name: "AWS_SECRET_ACCESS_KEY",
+                  value: process.env.AWS_SECRET_ACCESS_KEY,
+                },
               ],
             },
           ],
